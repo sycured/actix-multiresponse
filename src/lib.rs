@@ -30,8 +30,8 @@ use crate::error::PayloadError;
 pub use crate::headers::ContentType;
 
 use actix_web::body::BoxBody;
-use actix_web::{FromRequest, HttpRequest, HttpResponse, Responder};
 use actix_web::http::StatusCode;
+use actix_web::{FromRequest, HttpRequest, HttpResponse, Responder};
 
 use std::future::Future;
 use std::ops::{Deref, DerefMut};
@@ -122,15 +122,15 @@ impl<T: 'static + SerdeSupportDeserialize + ProtobufSupport + Default + Clone> F
         Box::pin(async move {
             let mut payload_bytes = Vec::new();
             while let Some(Ok(b)) = payload.next().await {
-                payload_bytes.append(&mut b.to_vec())
+                payload_bytes.append(&mut b.to_vec());
             }
 
             let content_type = ContentType::from_request_content_type(&req);
             if content_type.eq(&ContentType::Other) {
-                return Err(PayloadError::InvalidContentType)
+                return Err(PayloadError::InvalidContentType);
             }
 
-            let this = Payload::deserialize(&payload_bytes, content_type)?;
+            let this = Self::deserialize(&payload_bytes, &content_type)?;
 
             Ok(this)
         })
@@ -157,11 +157,10 @@ impl<T: ProtobufSupport + SerdeSupportSerialize + Default + Clone> Responder for
             content_type
         };
 
-        let serialized = match self.serialize(content_type.clone()) {
+        let serialized = match self.serialize(&content_type) {
             Ok(x) => x,
             Err(e) => {
-                return HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(e.to_string());
+                return HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).body(e.to_string());
             }
         };
 
@@ -170,10 +169,12 @@ impl<T: ProtobufSupport + SerdeSupportSerialize + Default + Clone> Responder for
             #[cfg(feature = "json")]
             ContentType::Json => response.insert_header(("Content-Type", "application/json")),
             #[cfg(feature = "protobuf")]
-            ContentType::Protobuf => response.insert_header(("Content-Type", "application/protobuf")),
+            ContentType::Protobuf => {
+                response.insert_header(("Content-Type", "application/protobuf"))
+            }
             #[cfg(feature = "xml")]
             ContentType::Xml => response.insert_header(("Content-Type", "application/xml")),
-            ContentType::Other => panic!("Must have ast least one format feature enabled.")
+            ContentType::Other => panic!("Must have ast least one format feature enabled."),
         };
 
         response.body(serialized)
@@ -207,57 +208,57 @@ pub enum DeserializeError {
     #[error("Failed to deserialize from XML: {0}")]
     Xml(#[from] quick_xml::DeError),
     #[error("Unable to deserialize")]
-    Undeserializable
+    Undeserializable,
 }
 
 impl<T: ProtobufSupport + SerdeSupportSerialize + Default + Clone> Payload<T> {
-    pub fn serialize(&self, content_type: ContentType) -> Result<Vec<u8>, SerializeError> {
+    pub fn serialize(&self, content_type: &ContentType) -> Result<Vec<u8>, SerializeError> {
         match content_type {
             #[cfg(feature = "json")]
             ContentType::Json => {
                 let json = serde_json::to_string_pretty(&self.0)?;
                 Ok(json.into_bytes())
-            },
+            }
             #[cfg(feature = "protobuf")]
             ContentType::Protobuf => {
                 let mut protobuf = Vec::new();
-                self.0.encode(&mut protobuf)
+                self.0
+                    .encode(&mut protobuf)
                     .map_err(|e| SerializeError::Prost(e.to_string()))?;
                 Ok(protobuf)
-            },
+            }
             #[cfg(feature = "xml")]
             ContentType::Xml => {
                 let xml = quick_xml::se::to_string(&self.0)?;
                 Ok(xml.into_bytes())
             }
-            ContentType::Other => Err(SerializeError::Unserializable)
+            ContentType::Other => Err(SerializeError::Unserializable),
         }
     }
 }
 
 impl<T: ProtobufSupport + SerdeSupportDeserialize + Default + Clone> Payload<T> {
-    pub fn deserialize(body: &[u8], content_type: ContentType) -> Result<Self, DeserializeError> {
+    pub fn deserialize(body: &[u8], content_type: &ContentType) -> Result<Self, DeserializeError> {
         match content_type {
             #[cfg(feature = "json")]
             ContentType::Json => {
                 let payload: T = serde_json::from_slice(body)?;
                 Ok(Self(payload))
-            },
+            }
             #[cfg(feature = "protobuf")]
             ContentType::Protobuf => {
-                let payload = T::decode(body)
-                    .map_err(|e| DeserializeError::Prost(e.to_string()))?;
+                let payload =
+                    T::decode(body).map_err(|e| DeserializeError::Prost(e.to_string()))?;
                 Ok(Self(payload))
-            },
+            }
             #[cfg(feature = "xml")]
             ContentType::Xml => {
                 let payload: T = quick_xml::de::from_reader(body)?;
-                Ok(Self(payload) )
+                Ok(Self(payload))
             }
-            ContentType::Other => Err(DeserializeError::Undeserializable)
+            ContentType::Other => Err(DeserializeError::Undeserializable),
         }
     }
-
 }
 
 #[cfg(test)]

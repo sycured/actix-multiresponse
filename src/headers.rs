@@ -1,4 +1,5 @@
 use actix_web::HttpRequest;
+use cfg_if::cfg_if;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ContentType {
@@ -13,7 +14,7 @@ pub enum ContentType {
 
 impl Default for ContentType {
     fn default() -> Self {
-        cfg_if::cfg_if! {
+        cfg_if! {
             if #[cfg(feature = "json")] {
                 Self::Json
             } else if #[cfg(feature = "protobuf")] {
@@ -29,11 +30,13 @@ impl Default for ContentType {
 
 impl ContentType {
     #[inline]
+    #[must_use]
     pub fn from_request_content_type(req: &HttpRequest) -> Self {
         Self::from_request_header(req, "Content-Type")
     }
 
     #[inline]
+    #[must_use]
     pub fn from_request_accepts(req: &HttpRequest) -> Self {
         Self::from_request_header(req, "Accept")
     }
@@ -45,27 +48,28 @@ impl ContentType {
                 let l = hv_str.to_lowercase();
 
                 if l.starts_with("application/json") {
-                    #[cfg(feature = "json")]
-                    return Self::Json;
-                    #[cfg(not(feature = "json"))]
-                    return Self::Other;
+                    cfg_if!(if #[cfg(feature = "json")] {
+                        return Self::Json
+                    } else {
+                        return Self::Other
+                    });
                 } else if l.starts_with("application/protobuf") {
-                    #[cfg(feature = "protobuf")]
-                    return Self::Protobuf;
-                    #[cfg(not(feature = "protobuf"))]
-                    return Self::Other;
+                    cfg_if!(if #[cfg(feature = "protobuf")] {
+                        return Self::Protobuf
+                    } else {
+                        return Self::Other
+                    });
                 } else if l.starts_with("application/xml") || l.starts_with("text/xml") {
-                    #[cfg(feature = "xml")]
-                    return Self::Xml;
-                    #[cfg(not(feature = "xml"))]
-                    return Self::Other;
-                } else {
-                    return Self::Other;
+                    cfg_if!(if #[cfg(feature = "xml")] {
+                        return Self::Xml
+                    } else {
+                        return Self::Other
+                    });
                 }
             }
+            return Self::Other;
         }
-
-        ContentType::Other
+        Self::Other
     }
 }
 
@@ -84,7 +88,7 @@ mod test {
         assert_eq!(
             ContentType::Json,
             ContentType::from_request_content_type(&req)
-        )
+        );
     }
 
     #[test]
@@ -97,7 +101,7 @@ mod test {
         assert_eq!(
             ContentType::Json,
             ContentType::from_request_content_type(&req)
-        )
+        );
     }
 
     #[test]
@@ -110,7 +114,7 @@ mod test {
         assert_eq!(
             ContentType::Protobuf,
             ContentType::from_request_content_type(&req)
-        )
+        );
     }
 
     #[test]
@@ -123,7 +127,7 @@ mod test {
         assert_eq!(
             ContentType::Protobuf,
             ContentType::from_request_content_type(&req)
-        )
+        );
     }
 
     #[test]
@@ -136,7 +140,7 @@ mod test {
         assert_eq!(
             ContentType::Xml,
             ContentType::from_request_content_type(&req)
-        )
+        );
     }
 
     #[test]
@@ -149,7 +153,7 @@ mod test {
         assert_eq!(
             ContentType::Xml,
             ContentType::from_request_content_type(&req)
-        )
+        );
     }
 
     #[test]
