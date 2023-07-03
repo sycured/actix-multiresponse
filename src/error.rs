@@ -1,8 +1,7 @@
-use crate::DeserializeError;
-use actix_web::body::BoxBody;
-use actix_web::http::StatusCode;
-use actix_web::{HttpResponse, ResponseError};
+use actix_web::{body::BoxBody, http::StatusCode, HttpResponse, ResponseError};
 use thiserror::Error;
+
+use crate::DeserializeError;
 
 #[derive(Debug, Error)]
 pub enum PayloadError {

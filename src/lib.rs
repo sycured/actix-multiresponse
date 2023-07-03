@@ -26,19 +26,20 @@
 //!     }
 //! ```
 
-use crate::error::PayloadError;
-pub use crate::headers::ContentType;
+use std::{
+    future::Future,
+    ops::{Deref, DerefMut},
+    pin::Pin,
+};
 
-use actix_web::body::BoxBody;
-use actix_web::http::StatusCode;
-use actix_web::{FromRequest, HttpRequest, HttpResponse, Responder};
-
-use std::future::Future;
-use std::ops::{Deref, DerefMut};
-use std::pin::Pin;
-
+use actix_web::{
+    body::BoxBody, http::StatusCode, FromRequest, HttpRequest, HttpResponse, Responder,
+};
 use futures_util::StreamExt;
 use thiserror::Error;
+
+use crate::error::PayloadError;
+pub use crate::headers::ContentType;
 
 mod error;
 mod headers;
@@ -263,9 +264,10 @@ impl<T: ProtobufSupport + SerdeSupportDeserialize + Default + Clone> Payload<T> 
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use prost_derive::Message;
     use serde_derive::{Deserialize, Serialize};
+
+    use super::*;
 
     #[derive(Deserialize, Serialize, Message, Clone)]
     struct TestPayload {
